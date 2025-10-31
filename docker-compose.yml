@@ -1,0 +1,89 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: wth-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-wth}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wth-network
+    profiles:
+      - with-db
+
+  backend-with-db:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wth-backend
+    environment:
+      WM_BASE_URL: ${WM_BASE_URL:-https://api.warframe.market/v1}
+      PLATFORM: ${PLATFORM:-pc}
+      STRATEGY: ${STRATEGY:-balanced}
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-45}
+      USE_DB: "true"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/wth}
+      PLATFORM_FEE_PCT: ${PLATFORM_FEE_PCT:-0}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks:
+      - wth-network
+    profiles:
+      - with-db
+    restart: unless-stopped
+
+  backend-no-db:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wth-backend
+    environment:
+      WM_BASE_URL: ${WM_BASE_URL:-https://api.warframe.market/v1}
+      PLATFORM: ps4
+      STRATEGY: aggressive
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-45}
+      USE_DB: "false"
+      PLATFORM_FEE_PCT: ${PLATFORM_FEE_PCT:-0}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
+    ports:
+      - "8000:8000"
+    networks:
+      - wth-network
+    profiles:
+      - no-db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_WS_URL: ws://localhost:8000
+    container_name: wth-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - wth-network
+    restart: unless-stopped
+    profiles:
+      - with-db
+      - no-db
+
+volumes:
+  postgres_data:
+
+networks:
+  wth-network:
+    driver: bridge
