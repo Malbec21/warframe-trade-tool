@@ -1,0 +1,6 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "echo 'This is a docker-compose project. Deploy backend and frontend separately.'"
+
