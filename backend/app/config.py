@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     # Database
     use_db: bool = True
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/wth"
+    
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def parse_database_url(cls, v: str) -> str:
+        """Convert Railway's postgresql:// URL to asyncpg format if needed."""
+        if isinstance(v, str):
+            # If it's already asyncpg format, return as-is
+            if "postgresql+asyncpg://" in v:
+                return v
+            # If it's standard postgresql://, convert to asyncpg
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # CORS
     backend_cors_origins: list[str] = [
