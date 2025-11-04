@@ -68,9 +68,26 @@ app = FastAPI(
 )
 
 # Configure CORS
+# Filter out wildcard patterns for allow_origins (they go to allow_origin_regex)
+exact_origins = [origin for origin in settings.backend_cors_origins if "*" not in origin]
+regex_origins = [origin for origin in settings.backend_cors_origins if "*" in origin]
+
+# Convert wildcard patterns to regex
+origin_regex = None
+if regex_origins:
+    # Convert *.vercel.app to regex pattern
+    regex_patterns = []
+    for pattern in regex_origins:
+        # Convert * to regex .*
+        regex = pattern.replace("*", ".*")
+        regex_patterns.append(regex)
+    # Combine patterns with |
+    origin_regex = "|".join(f"({r})" for r in regex_patterns)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.backend_cors_origins,
+    allow_origins=exact_origins if exact_origins else None,
+    allow_origin_regex=origin_regex if origin_regex else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

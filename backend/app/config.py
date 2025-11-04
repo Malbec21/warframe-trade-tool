@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     backend_cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
+        "https://*.vercel.app",  # Allow all Vercel preview deployments
+        "https://warframe-trade-helper-frontend-*.vercel.app",  # Specific pattern
     ]
 
     @field_validator("backend_cors_origins", mode="before")
@@ -31,7 +33,14 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v: Any) -> list[str]:
         """Parse CORS origins from JSON string or list."""
         if isinstance(v, str):
-            return json.loads(v)
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+                return [parsed]
+            except json.JSONDecodeError:
+                # If it's not valid JSON, treat as single origin
+                return [v]
         return v
 
     class Config:
