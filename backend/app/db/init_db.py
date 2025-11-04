@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db.base import Base
-from app.db.models import Frame
+from app.db.models import Frame, User, TradeSession, TradePart, PriceHistory, PriceSnapshot, SetSnapshot
 from app.db.session import async_session_maker, engine
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from typing import Any
 
 from app.config import settings
 from app.db.init_db import get_all_frames
-from app.db.models import PriceSnapshot, SetSnapshot
+from app.db.models import PriceHistory, PriceSnapshot, SetSnapshot
 from app.db.session import async_session_maker
 from app.services.market_client import get_market_client
 from app.services.pricing import calculate_frame_opportunity
@@ -89,7 +89,6 @@ class MarketDataScheduler:
                         frame_name=frame_name,
                         parts=parts,
                         market_orders=market_orders,
-                        strategy=settings.strategy,
                         platform=settings.platform,
                         item_type=item_type,
                     )
@@ -101,12 +100,13 @@ class MarketDataScheduler:
                 except Exception as e:
                     logger.error(f"Error calculating opportunity for {frame_id}: {e}")
 
-            # Store snapshots in database if enabled
+            # Store snapshots and price history in database if enabled
             if settings.use_db:
                 try:
                     await self._store_snapshots(opportunities)
+                    await self._store_price_history(opportunities)
                 except Exception as e:
-                    logger.error(f"Error storing snapshots: {e}")
+                    logger.error(f"Error storing snapshots/history: {e}")
 
             # Update current opportunities
             self.current_opportunities = opportunities
@@ -151,6 +151,38 @@ class MarketDataScheduler:
                 session.add(set_snapshot)
 
             await session.commit()
+
+    async def _store_price_history(self, opportunities: list[dict[str, Any]]) -> None:
+        """Store price history for 48-hour tracking."""
+        async with async_session_maker() as session:
+            timestamp = datetime.utcnow()
+            
+            for opp in opportunities:
+                # Store individual part prices with seller info
+                for part in opp["parts"]:
+                    price_record = PriceHistory(
+                        item_id=opp["frame_id"],
+                        part_name=part["name"],
+                        price=part["price"],
+                        seller=part.get("seller", "User"),
+                        platform=opp["platform"],
+                        timestamp=timestamp,
+                    )
+                    session.add(price_record)
+                
+                # Store full set price with seller info
+                set_price_record = PriceHistory(
+                    item_id=opp["frame_id"],
+                    part_name="Full Set",
+                    price=opp["full_set_price"],
+                    seller=opp.get("seller", "User"),
+                    platform=opp["platform"],
+                    timestamp=timestamp,
+                )
+                session.add(set_price_record)
+            
+            await session.commit()
+            logger.debug(f"Stored price history for {len(opportunities)} items")
 
     async def _check_alerts(self, opportunities: list[dict[str, Any]]) -> None:
         """Check opportunities against thresholds and send alerts."""

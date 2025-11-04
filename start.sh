@@ -6,7 +6,7 @@
 set -e
 
 echo "╔═══════════════════════════════════════════════════════╗"
-echo "║     Warframe Trade Helper - Startup Script          ║"
+echo "║     Warframe Trade Helper - Startup Script            ║"
 echo "╚═══════════════════════════════════════════════════════╝"
 echo ""
 
@@ -81,7 +81,7 @@ sleep 5
 if docker compose --profile $PROFILE ps | grep -q "Up"; then
     echo ""
     echo "╔═══════════════════════════════════════════════════════╗"
-    echo "║          🎉 Application Started Successfully!        ║"
+    echo "║            Application Started Successfully!          ║"
     echo "╚═══════════════════════════════════════════════════════╝"
     echo ""
     echo "📍 Access the application:"

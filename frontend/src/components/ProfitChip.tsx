@@ -16,9 +16,9 @@ export function ProfitChip({ profit, margin, size = 'md' }: ProfitChipProps) {
 
   const colorClasses = isPositive
     ? isHighMargin
-      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
-      : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
-    : 'bg-gray-200 text-gray-700';
+      ? 'bg-gradient-to-r from-wf-accent-green to-emerald-500 text-white'
+      : 'bg-gradient-to-r from-wf-primary to-wf-accent-blue text-white'
+    : 'bg-gray-700 text-gray-300';
 
   return (
     <span

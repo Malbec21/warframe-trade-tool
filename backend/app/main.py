@@ -8,6 +8,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.api.routes_auth import router as auth_router
+from app.api.routes_prices import router as prices_router
+from app.api.routes_trades import router as trades_router
 from app.config import settings
 from app.db.init_db import init_db
 from app.services.market_client import cleanup_market_client
@@ -75,6 +78,9 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(trades_router, prefix="/api/v1")
+app.include_router(prices_router, prefix="/api/v1")
 
 
 @app.get("/")

@@ -3,26 +3,50 @@
  */
 
 import { API_URL } from './constants';
-import type { Config, FrameDetail, FrameInfo, Opportunity } from './types';
+import type { Config, FrameDetail, FrameInfo, Opportunity, User, TradeSession, TradeSessionCreate, TradePartCreate, PriceHistorySummary } from './types';
 
 class ApiClient {
   private baseUrl: string;
+  private token: string | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+    // Load token from localStorage
+    this.token = localStorage.getItem('auth_token');
+  }
+
+  setToken(token: string | null) {
+    this.token = token;
+    if (token) {
+      localStorage.setItem('auth_token', token);
+    } else {
+      localStorage.removeItem('auth_token');
+    }
+  }
+
+  getToken(): string | null {
+    return this.token;
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    };
+
+    // Add auth token if available
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers,
     });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const error = await response.text();
+      throw new Error(`API error: ${response.status} ${error}`);
     }
 
     return response.json();
@@ -38,6 +62,10 @@ class ApiClient {
 
   async getFrames(): Promise<FrameInfo[]> {
     return this.request('/api/v1/frames');
+  }
+
+  async getFrameDetails(frameId: string): Promise<any> {
+    return this.request(`/api/v1/frames/${frameId}`);
   }
 
   async getOpportunities(params?: {
@@ -67,6 +95,96 @@ class ApiClient {
 
   async getFrameDetail(frameId: string): Promise<FrameDetail> {
     return this.request(`/api/v1/frames/${frameId}`);
+  }
+
+  // ============================================================================
+  // Authentication
+  // ============================================================================
+
+  async signup(username: string, email: string, password: string): Promise<{ access_token: string; user: User }> {
+    return this.request('/api/v1/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, password }),
+    });
+  }
+
+  async login(username: string, password: string): Promise<{ access_token: string; user: User }> {
+    return this.request('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  }
+
+  // ============================================================================
+  // Trade Sessions
+  // ============================================================================
+
+  async createTradeSession(data: TradeSessionCreate): Promise<TradeSession> {
+    return this.request('/api/v1/trades', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addPartToSession(sessionId: number, part: TradePartCreate): Promise<any> {
+    return this.request(`/api/v1/trades/${sessionId}/parts`, {
+      method: 'POST',
+      body: JSON.stringify(part),
+    });
+  }
+
+  async updateTradeSession(sessionId: number, data: { set_sell_price?: number; status?: string }): Promise<TradeSession> {
+    return this.request(`/api/v1/trades/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getTradeSession(sessionId: number): Promise<TradeSession> {
+    return this.request(`/api/v1/trades/${sessionId}`);
+  }
+
+  async listTradeSessions(params?: { status_filter?: string; days?: number }): Promise<{
+    sessions: TradeSession[];
+    total_sessions: number;
+    total_profit: number;
+    completed_sessions: number;
+    in_progress_sessions: number;
+  }> {
+    const searchParams = new URLSearchParams();
+    if (params?.status_filter) {
+      searchParams.append('status_filter', params.status_filter);
+    }
+    if (params?.days !== undefined) {
+      searchParams.append('days', params.days.toString());
+    }
+
+    const query = searchParams.toString();
+    const endpoint = `/api/v1/trades${query ? `?${query}` : ''}`;
+    return this.request(endpoint);
+  }
+
+  async deleteTradeSession(sessionId: number): Promise<void> {
+    await fetch(`${this.baseUrl}/api/v1/trades/${sessionId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+  }
+
+  // ============================================================================
+  // Price History
+  // ============================================================================
+
+  async getPriceHistory(itemId: string, platform: string = 'pc', hours: number = 48): Promise<PriceHistorySummary[]> {
+    const searchParams = new URLSearchParams({ platform, hours: hours.toString() });
+    return this.request(`/api/v1/prices/history/${itemId}?${searchParams.toString()}`);
+  }
+
+  async getLowestPrices(itemId: string, platform: string = 'pc', hours: number = 48): Promise<Record<string, number>> {
+    const searchParams = new URLSearchParams({ platform, hours: hours.toString() });
+    return this.request(`/api/v1/prices/lowest/${itemId}?${searchParams.toString()}`);
   }
 }
 

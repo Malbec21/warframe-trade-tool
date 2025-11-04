@@ -1,6 +1,5 @@
-"""Pricing strategy and arbitrage calculation logic."""
+"""Pricing and arbitrage calculation logic."""
 import logging
-import statistics
 from typing import Any
 
 from app.config import settings
@@ -8,129 +7,27 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def calculate_percentile(values: list[float], percentile: float) -> float:
+def calculate_lowest_price(orders: list[dict[str, Any]]) -> tuple[float, str]:
     """
-    Calculate percentile of values.
+    Calculate the lowest price from orders.
 
     Args:
-        values: List of numeric values
-        percentile: Percentile to calculate (0-100)
+        orders: List of orders from API
 
     Returns:
-        Calculated percentile value
-    """
-    if not values:
-        return 0.0
-
-    sorted_values = sorted(values)
-    n = len(sorted_values)
-    rank = (percentile / 100.0) * (n - 1)
-    lower_idx = int(rank)
-    upper_idx = min(lower_idx + 1, n - 1)
-    fraction = rank - lower_idx
-
-    return sorted_values[lower_idx] + fraction * (
-        sorted_values[upper_idx] - sorted_values[lower_idx]
-    )
-
-
-def get_strategy_params(strategy: str) -> dict[str, Any]:
-    """
-    Get pricing parameters for a strategy.
-
-    Args:
-        strategy: Strategy name ("conservative", "balanced", "aggressive")
-
-    Returns:
-        Dictionary with buy/sell parameters
-    """
-    strategies = {
-        "conservative": {
-            "buy_metric": "median",
-            "buy_order_type": "sell",
-            "sell_metric": "max",
-            "sell_order_type": "buy",
-        },
-        "balanced": {
-            "buy_metric": "p35",
-            "buy_order_type": "sell",
-            "sell_metric": "median",
-            "sell_order_type": "sell",
-        },
-        "aggressive": {
-            "buy_metric": "min",
-            "buy_order_type": "sell",
-            "sell_metric": "min",
-            "sell_order_type": "sell",
-        },
-    }
-
-    return strategies.get(strategy, strategies["balanced"])
-
-
-def calculate_metric(orders: list[dict[str, Any]], metric: str) -> float:
-    """
-    Calculate price metric from orders.
-
-    Args:
-        orders: List of filtered orders
-        metric: Metric to calculate ("median", "p20", "p35", "p65", "max", "min")
-
-    Returns:
-        Calculated price
+        Tuple of (price, source_metric)
     """
     if not orders:
-        return 0.0
+        return 0.0, "no_orders"
 
     prices = [float(order.get("platinum", 0)) for order in orders]
     prices = [p for p in prices if p > 0]  # Filter out zero prices
 
     if not prices:
-        return 0.0
+        return 0.0, "no_valid_prices"
 
-    if metric == "median":
-        return statistics.median(prices)
-    elif metric == "max":
-        return max(prices)
-    elif metric == "min":
-        return min(prices)
-    elif metric.startswith("p"):
-        # Percentile (e.g., "p35" -> 35th percentile)
-        percentile = float(metric[1:])
-        return calculate_percentile(prices, percentile)
-
-    return 0.0
-
-
-def calculate_part_price(
-    orders: list[dict[str, Any]], strategy: str, is_buying: bool = True
-) -> tuple[float, str]:
-    """
-    Calculate price for a part based on strategy.
-
-    Args:
-        orders: List of orders from API
-        strategy: Strategy name
-        is_buying: True if buying this item, False if selling
-
-    Returns:
-        Tuple of (price, source_metric)
-    """
-    params = get_strategy_params(strategy)
-
-    if is_buying:
-        # We're buying parts - look at sell orders
-        order_type = params["buy_order_type"]
-        metric = params["buy_metric"]
-    else:
-        # We're selling the set - look at appropriate orders
-        order_type = params["sell_order_type"]
-        metric = params["sell_metric"]
-
-    price = calculate_metric(orders, metric)
-    source = f"{order_type}_{metric}"
-
-    return price, source
+    lowest_price = min(prices)
+    return lowest_price, "lowest_sell"
 
 
 def calculate_arbitrage(
@@ -180,7 +77,6 @@ async def calculate_frame_opportunity(
     frame_name: str,
     parts: list[str],
     market_orders: dict[str, list[dict[str, Any]]],
-    strategy: str = "balanced",
     platform: str = "pc",
     item_type: str = "warframe",
 ) -> dict[str, Any] | None:
@@ -192,8 +88,8 @@ async def calculate_frame_opportunity(
         frame_name: Frame display name
         parts: List of part names
         market_orders: Dictionary mapping item_url_name to orders
-        strategy: Pricing strategy
         platform: Platform name
+        item_type: Item type (warframe or weapon)
 
     Returns:
         Opportunity dictionary or None if incomplete data
@@ -209,7 +105,7 @@ async def calculate_frame_opportunity(
             logger.warning(f"No orders found for {part_item_name}")
             continue
 
-        price, source = calculate_part_price(orders, strategy, is_buying=True)
+        price, source = calculate_lowest_price(orders)
         if price > 0:
             part_prices[part] = (price, source)
 
@@ -221,7 +117,7 @@ async def calculate_frame_opportunity(
         logger.warning(f"No orders found for {set_item_name}")
         return None
 
-    set_price, set_source = calculate_part_price(set_orders, strategy, is_buying=False)
+    set_price, set_source = calculate_lowest_price(set_orders)
 
     if set_price == 0:
         return None
@@ -264,7 +160,6 @@ async def calculate_frame_opportunity(
         "frame_id": frame_id,
         "frame_name": frame_name,
         "platform": platform,
-        "strategy": strategy,
         "item_type": item_type,
         "parts": parts_with_sellers,
         "full_set_price": set_price,

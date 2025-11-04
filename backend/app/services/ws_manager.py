@@ -23,7 +23,6 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections.append(websocket)
         self.client_configs[websocket] = {
-            "strategy": "balanced",
             "min_profit": 0.0,
             "min_margin": 0.0,
             "platform": "pc",
@@ -42,14 +41,13 @@ class ConnectionManager:
         """Update configuration for a specific client."""
         if websocket in self.client_configs:
             self.client_configs[websocket].update(config)
-            logger.info(f"Updated config for client: {config}")
+            logger.debug(f"Updated config for client: {config}")
 
     def get_client_config(self, websocket: WebSocket) -> dict[str, Any]:
         """Get configuration for a specific client."""
         return self.client_configs.get(
             websocket,
             {
-                "strategy": "balanced",
                 "min_profit": 0.0,
                 "min_margin": 0.0,
                 "platform": "pc",

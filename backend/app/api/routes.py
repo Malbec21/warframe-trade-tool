@@ -36,7 +36,6 @@ async def get_config() -> ConfigResponse:
     """Get current configuration."""
     return ConfigResponse(
         platform=settings.platform,
-        strategy=settings.strategy,
         min_profit=0.0,
         min_margin=0.0,
         refresh_interval=settings.refresh_interval_seconds,
@@ -64,7 +63,6 @@ async def get_frames() -> list[FrameInfo]:
 async def get_opportunities(
     min_profit: float = Query(default=0.0, ge=0.0),
     min_margin: float = Query(default=0.0, ge=0.0),
-    strategy: str | None = Query(default=None),
     platform: str | None = Query(default=None),
 ) -> list[OpportunityResponse]:
     """
@@ -73,17 +71,12 @@ async def get_opportunities(
     Args:
         min_profit: Minimum profit threshold in platinum
         min_margin: Minimum profit margin threshold (0-1)
-        strategy: Optional strategy override
         platform: Optional platform override
 
     Returns:
         List of opportunities
     """
     opportunities = scheduler.get_current_opportunities(min_profit, min_margin)
-
-    # Filter by strategy if provided
-    if strategy:
-        opportunities = [opp for opp in opportunities if opp["strategy"] == strategy]
 
     # Filter by platform if provided
     if platform:
@@ -143,7 +136,6 @@ async def get_frame_details(frame_id: str) -> FrameDetailResponse:
                     {
                         "timestamp": snap.ts.isoformat(),
                         "set_price": float(snap.set_price),
-                        "strategy": snap.strategy,
                     }
                     for snap in reversed(set_snapshots)
                 ]
@@ -169,7 +161,7 @@ async def websocket_market(websocket: WebSocket) -> None:
     WebSocket endpoint for real-time market updates.
 
     Clients can send:
-    - {"type": "set_config", "strategy": "...", "min_profit": 10, "min_margin": 0.2}
+    - {"type": "set_config", "min_profit": 10, "min_margin": 0.2, "platform": "pc"}
 
     Server sends:
     - {"type": "market_update", "opportunities": [...], "timestamp": "..."}
@@ -202,7 +194,7 @@ async def websocket_market(websocket: WebSocket) -> None:
                     config = {
                         k: v
                         for k, v in message.items()
-                        if k in ["strategy", "min_profit", "min_margin", "platform"]
+                        if k in ["min_profit", "min_margin", "platform"]
                     }
                     manager.update_client_config(websocket, config)
 
