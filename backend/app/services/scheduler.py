@@ -132,7 +132,7 @@ class MarketDataScheduler:
                     snapshot = PriceSnapshot(
                         frame_id=opp["frame_id"],
                         part_name=part["name"],
-                        strategy=opp["strategy"],
+                        strategy="standard",  # Default strategy since we removed strategy selection
                         metric_type=part["source"],
                         price=part["price"],
                         platform=opp["platform"],
@@ -143,7 +143,7 @@ class MarketDataScheduler:
                 # Store set snapshot
                 set_snapshot = SetSnapshot(
                     frame_id=opp["frame_id"],
-                    strategy=opp["strategy"],
+                    strategy="standard",  # Default strategy since we removed strategy selection
                     set_price=opp["full_set_price"],
                     platform=opp["platform"],
                     ts=datetime.utcnow(),
