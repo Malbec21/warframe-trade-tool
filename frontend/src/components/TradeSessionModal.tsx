@@ -207,6 +207,15 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
         // Update existing session
         // First, add any new parts or update existing ones
         for (const part of filledParts) {
+          console.log(`[API Check] Part: ${part.name}`, {
+            existingId: part.existingId,
+            price: part.price,
+            originalPrice: part.originalPrice,
+            wasModified: part.wasModified,
+            isEditing: part.isEditing,
+            shouldUpdate: part.wasModified || (part.isEditing && part.originalPrice !== undefined && part.price !== part.originalPrice)
+          });
+
           if (!part.existingId) {
             // New part - add it
             console.log(`[API] Adding new part: ${part.name} at ${part.price} plat`);
