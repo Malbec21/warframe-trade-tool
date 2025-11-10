@@ -17,7 +17,7 @@ const formatStatus = (status: string): string => {
 export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession }: TradeSessionModalProps) {
   const [warframes, setWarframes] = useState<FrameInfo[]>([]);
   const [selectedWarframe, setSelectedWarframe] = useState<FrameInfo | null>(null);
-  const [parts, setParts] = useState<{ name: string; price: number; existingId?: number; isEditing?: boolean }[]>([]);
+  const [parts, setParts] = useState<{ name: string; price: number; existingId?: number; isEditing?: boolean; originalPrice?: number }[]>([]);
   const [setSellPrice, setSetSellPrice] = useState<number>(0);
   const [status, setStatus] = useState<'in_progress' | 'completed'>('in_progress');
   const [isLoading, setIsLoading] = useState(false);
@@ -116,7 +116,21 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
 
   const togglePartEditing = (index: number) => {
     const newParts = [...parts];
-    newParts[index].isEditing = !newParts[index].isEditing;
+    const part = newParts[index];
+    
+    if (!part.isEditing) {
+      // Entering edit mode - save the original price
+      part.originalPrice = part.price;
+      part.isEditing = true;
+    } else {
+      // Canceling edit mode - restore the original price
+      if (part.originalPrice !== undefined) {
+        part.price = part.originalPrice;
+      }
+      part.isEditing = false;
+      part.originalPrice = undefined;
+    }
+    
     setParts(newParts);
   };
 
