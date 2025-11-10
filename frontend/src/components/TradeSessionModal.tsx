@@ -203,7 +203,7 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
           wasModified: p.wasModified,
           isEditing: p.isEditing
         })));
-        
+
         // Update existing session
         // First, add any new parts or update existing ones
         for (const part of filledParts) {
@@ -214,15 +214,15 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
               part_name: part.name,
               purchase_price: part.price,
             });
-          } else if (part.wasModified) {
-            // Update existing part only if it was actually modified
+          } else if (part.wasModified || (part.isEditing && part.originalPrice !== undefined && part.price !== part.originalPrice)) {
+            // Update existing part if it was marked as modified OR if it's in edit mode with a changed price
             console.log(`[API] Updating part: ${part.name} from ${part.originalPrice} to ${part.price} plat`);
             await api.updateTradePart(existingSession.id, part.existingId, {
               part_name: part.name,
               purchase_price: part.price,
             });
           } else {
-            console.log(`[API] Skipping unchanged part: ${part.name} (${part.price} plat, wasModified=${part.wasModified})`);
+            console.log(`[API] Skipping unchanged part: ${part.name} (${part.price} plat, wasModified=${part.wasModified}, isEditing=${part.isEditing})`);
           }
         }
 
