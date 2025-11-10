@@ -133,6 +133,13 @@ class ApiClient {
     });
   }
 
+  async updateTradePart(sessionId: number, partId: number, part: TradePartCreate): Promise<any> {
+    return this.request(`/api/v1/trades/${sessionId}/parts/${partId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(part),
+    });
+  }
+
   async updateTradeSession(sessionId: number, data: { set_sell_price?: number; status?: string }): Promise<TradeSession> {
     return this.request(`/api/v1/trades/${sessionId}`, {
       method: 'PATCH',

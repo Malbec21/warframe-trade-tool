@@ -151,6 +151,89 @@ async def add_part_to_session(
     )
 
 
+@router.patch("/{session_id}/parts/{part_id}", response_model=TradePartResponse)
+async def update_trade_part(
+    session_id: int,
+    part_id: int,
+    part_data: TradePartCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> TradePartResponse:
+    """
+    Update a trade part's price.
+    
+    Args:
+        session_id: Trade session ID
+        part_id: Trade part ID
+        part_data: Updated part data
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Updated trade part
+        
+    Raises:
+        HTTPException: If session or part not found or doesn't belong to user
+    """
+    # Get session and verify ownership
+    result = await db.execute(
+        select(TradeSession).where(
+            TradeSession.id == session_id, TradeSession.user_id == current_user.id
+        )
+    )
+    session = result.scalar_one_or_none()
+    
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trade session not found",
+        )
+    
+    # Get part and verify it belongs to this session
+    result = await db.execute(
+        select(TradePart).where(
+            TradePart.id == part_id, TradePart.session_id == session_id
+        )
+    )
+    part = result.scalar_one_or_none()
+    
+    if part is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trade part not found",
+        )
+    
+    # Calculate price difference for total cost adjustment
+    old_price = float(part.purchase_price)
+    new_price = part_data.purchase_price
+    price_diff = new_price - old_price
+    
+    # Update part
+    part.purchase_price = new_price
+    if part_data.purchase_date:
+        part.purchase_date = part_data.purchase_date
+    if part_data.notes is not None:
+        part.notes = part_data.notes
+    
+    # Update session total cost
+    session.total_cost = float(session.total_cost) + price_diff
+    
+    # Recalculate profit if sell price is set
+    if session.set_sell_price is not None:
+        session.profit = calculate_session_profit(session)
+    
+    await db.commit()
+    await db.refresh(part)
+    
+    return TradePartResponse(
+        id=part.id,
+        part_name=part.part_name,
+        purchase_price=float(part.purchase_price),
+        purchase_date=part.purchase_date,
+        notes=part.notes,
+    )
+
+
 @router.patch("/{session_id}", response_model=TradeSessionResponse)
 async def update_trade_session(
     session_id: int,

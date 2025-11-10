@@ -175,9 +175,13 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
               part_name: part.name,
               purchase_price: part.price,
             });
+          } else {
+            // Update existing part
+            await api.updateTradePart(existingSession.id, part.existingId, {
+              part_name: part.name,
+              purchase_price: part.price,
+            });
           }
-          // Note: We can't update existing parts via API currently
-          // This would require a PATCH endpoint for individual parts
         }
 
         // Update session with sell price and status
