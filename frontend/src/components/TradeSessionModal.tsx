@@ -116,6 +116,9 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
     // Mark as modified if it's an existing part and price changed from original
     if (part.existingId && part.originalPrice !== undefined) {
       part.wasModified = price !== part.originalPrice;
+      console.log(`[Price Change] ${part.name}: ${part.originalPrice} → ${price}, wasModified = ${part.wasModified}`);
+    } else {
+      console.log(`[Price Change] ${part.name}: new price = ${price} (new part or not in edit mode)`);
     }
     
     setParts(newParts);
@@ -127,11 +130,13 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
     
     if (!part.isEditing) {
       // Entering edit mode - save the original price
+      console.log(`[Edit Mode] ${part.name}: Entering edit mode, original price = ${part.price}`);
       part.originalPrice = part.price;
       part.isEditing = true;
       part.wasModified = false;
     } else {
       // Canceling edit mode - restore the original price
+      console.log(`[Cancel Edit] ${part.name}: Restoring price from ${part.price} to ${part.originalPrice}`);
       if (part.originalPrice !== undefined) {
         part.price = part.originalPrice;
       }
@@ -189,25 +194,35 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
 
     try {
       if (isEditing && existingSession) {
+        console.log('[Submit] Editing existing session:', existingSession.id);
+        console.log('[Submit] Parts state:', filledParts.map(p => ({
+          name: p.name,
+          price: p.price,
+          existingId: p.existingId,
+          originalPrice: p.originalPrice,
+          wasModified: p.wasModified,
+          isEditing: p.isEditing
+        })));
+        
         // Update existing session
         // First, add any new parts or update existing ones
         for (const part of filledParts) {
           if (!part.existingId) {
             // New part - add it
-            console.log(`Adding new part: ${part.name} at ${part.price} plat`);
+            console.log(`[API] Adding new part: ${part.name} at ${part.price} plat`);
             await api.addPartToSession(existingSession.id, {
               part_name: part.name,
               purchase_price: part.price,
             });
           } else if (part.wasModified) {
             // Update existing part only if it was actually modified
-            console.log(`Updating part: ${part.name} from ${part.originalPrice} to ${part.price} plat`);
+            console.log(`[API] Updating part: ${part.name} from ${part.originalPrice} to ${part.price} plat`);
             await api.updateTradePart(existingSession.id, part.existingId, {
               part_name: part.name,
               purchase_price: part.price,
             });
           } else {
-            console.log(`Skipping unchanged part: ${part.name} (${part.price} plat)`);
+            console.log(`[API] Skipping unchanged part: ${part.name} (${part.price} plat, wasModified=${part.wasModified})`);
           }
         }
 
