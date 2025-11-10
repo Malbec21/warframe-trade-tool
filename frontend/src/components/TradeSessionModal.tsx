@@ -17,7 +17,7 @@ const formatStatus = (status: string): string => {
 export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession }: TradeSessionModalProps) {
   const [warframes, setWarframes] = useState<FrameInfo[]>([]);
   const [selectedWarframe, setSelectedWarframe] = useState<FrameInfo | null>(null);
-  const [parts, setParts] = useState<{ name: string; price: number; existingId?: number; isEditing?: boolean; originalPrice?: number }[]>([]);
+  const [parts, setParts] = useState<{ name: string; price: number; existingId?: number; isEditing?: boolean; originalPrice?: number; wasModified?: boolean }[]>([]);
   const [setSellPrice, setSetSellPrice] = useState<number>(0);
   const [status, setStatus] = useState<'in_progress' | 'completed'>('in_progress');
   const [isLoading, setIsLoading] = useState(false);
@@ -110,7 +110,14 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
   const handlePartPriceChange = (index: number, value: string) => {
     const price = Math.max(0, parseInt(value) || 0); // Ensure positive integer
     const newParts = [...parts];
-    newParts[index].price = price;
+    const part = newParts[index];
+    part.price = price;
+    
+    // Mark as modified if it's an existing part and price changed from original
+    if (part.existingId && part.originalPrice !== undefined) {
+      part.wasModified = price !== part.originalPrice;
+    }
+    
     setParts(newParts);
   };
 
@@ -122,6 +129,7 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
       // Entering edit mode - save the original price
       part.originalPrice = part.price;
       part.isEditing = true;
+      part.wasModified = false;
     } else {
       // Canceling edit mode - restore the original price
       if (part.originalPrice !== undefined) {
@@ -129,6 +137,7 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
       }
       part.isEditing = false;
       part.originalPrice = undefined;
+      part.wasModified = false;
     }
     
     setParts(newParts);
@@ -184,17 +193,21 @@ export function TradeSessionModal({ isOpen, onClose, onSuccess, existingSession 
         // First, add any new parts or update existing ones
         for (const part of filledParts) {
           if (!part.existingId) {
-            // New part
+            // New part - add it
+            console.log(`Adding new part: ${part.name} at ${part.price} plat`);
             await api.addPartToSession(existingSession.id, {
               part_name: part.name,
               purchase_price: part.price,
             });
-          } else {
-            // Update existing part
+          } else if (part.wasModified) {
+            // Update existing part only if it was actually modified
+            console.log(`Updating part: ${part.name} from ${part.originalPrice} to ${part.price} plat`);
             await api.updateTradePart(existingSession.id, part.existingId, {
               part_name: part.name,
               purchase_price: part.price,
             });
+          } else {
+            console.log(`Skipping unchanged part: ${part.name} (${part.price} plat)`);
           }
         }
 
